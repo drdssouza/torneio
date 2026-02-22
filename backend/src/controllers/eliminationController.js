@@ -32,10 +32,21 @@ export const getElimination = async (req, res) => {
 export const advanceWinner = async (req, res) => {
   try {
     const { id } = req.params;
-    const { score1, score2 } = req.body;
-    const match = await eliminationService.advanceWinner(parseInt(id), score1, score2);
+    const { score1, score2, isWo, woTeam } = req.body;
+    const match = await eliminationService.advanceWinner(parseInt(id), score1, score2, isWo, woTeam);
     res.json(match);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+};
+
+export const updateMatchTeams = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { team1Id, team2Id } = req.body;
+    const match = await eliminationService.updateMatchTeams(parseInt(id), team1Id, team2Id);
+    res.json(match);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
   }
 };

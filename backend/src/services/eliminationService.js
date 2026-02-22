@@ -1,6 +1,17 @@
 import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
+// Ordena duplas por campanha: vitórias desc → saldo desc → games vencidos desc
+function sortByCampaign(teams) {
+  return [...teams].sort((a, b) => {
+    if (b.wins !== a.wins) return b.wins - a.wins;
+    const saldoA = a.gamesWon - a.gamesLost;
+    const saldoB = b.gamesWon - b.gamesLost;
+    if (saldoB !== saldoA) return saldoB - saldoA;
+    return b.gamesWon - a.gamesWon;
+  });
+}
+
 export const generateElimination = async (category, gender, tournamentId) => {
   // Limpar eliminatórias anteriores
   await prisma.match.deleteMany({
@@ -27,7 +38,6 @@ export const generateElimination = async (category, gender, tournamentId) => {
   });
 
   // ===== CATEGORIA B: formato especial =====
-  // 1 grupo único, 1º vai direto à final, 2º x 3º na semi, final melhor de 3 sets
   if (category === 'B') {
     if (groups.length !== 1) {
       throw new Error('Categoria B deve ter exatamente 1 grupo');
@@ -82,109 +92,60 @@ export const generateElimination = async (category, gender, tournamentId) => {
     }
   });
 
-  // Pegar os classificados
-  const first_A = groupMap['A'][0];
-  const second_A = groupMap['A'][1];
-  const first_B = groupMap['B'][0];
-  const second_B = groupMap['B'][1];
-  const first_C = groupMap['C'][0];
-  const second_C = groupMap['C'][1];
-  const first_D = groupMap['D'][0];
-  const second_D = groupMap['D'][1];
-
-  // LOG DE DEBUG
-  console.log('=== CLASSIFICADOS ===');
-  console.log('Grupo A - 1º:', first_A.player1, '/', first_A.player2);
-  console.log('Grupo A - 2º:', second_A.player1, '/', second_A.player2);
-  console.log('Grupo B - 1º:', first_B.player1, '/', first_B.player2);
-  console.log('Grupo B - 2º:', second_B.player1, '/', second_B.player2);
-  console.log('Grupo C - 1º:', first_C.player1, '/', first_C.player2);
-  console.log('Grupo C - 2º:', second_C.player1, '/', second_C.player2);
-  console.log('Grupo D - 1º:', first_D.player1, '/', first_D.player2);
-  console.log('Grupo D - 2º:', second_D.player1, '/', second_D.player2);
+  // Pegar os classificados (1º e 2º de cada grupo)
+  const classified = [
+    groupMap['A'][0], groupMap['A'][1],
+    groupMap['B'][0], groupMap['B'][1],
+    groupMap['C'][0], groupMap['C'][1],
+    groupMap['D'][0], groupMap['D'][1],
+  ];
 
   // Verificar se não há IDs duplicados
-  const allIds = [
-    first_A.id, second_A.id, first_B.id, second_B.id,
-    first_C.id, second_C.id, first_D.id, second_D.id
-  ];
+  const allIds = classified.map(t => t.id);
   const uniqueIds = new Set(allIds);
-
   if (uniqueIds.size !== 8) {
     console.error('ERRO: IDs duplicados detectados!', allIds);
     throw new Error('Erro: duplas duplicadas nas classificações. Verifique os grupos.');
   }
 
-  // Criar as quartas de final
+  // === CRUZAMENTO POR CAMPANHA ===
+  // Ordenar todos os 8 classificados pela campanha geral
+  const ranked = sortByCampaign(classified);
+
+  console.log('=== CLASSIFICADOS POR CAMPANHA ===');
+  ranked.forEach((t, i) => {
+    const saldo = t.gamesWon - t.gamesLost;
+    console.log(`${i+1}º: ${t.player1}/${t.player2} | Vitórias: ${t.wins} | Saldo: ${saldo} | Games: ${t.gamesWon}`);
+  });
+
+  // Cruzamento: 1º x 8º, 2º x 7º, 3º x 6º, 4º x 5º
+  const matchups = [
+    [ranked[0], ranked[7]],
+    [ranked[1], ranked[6]],
+    [ranked[2], ranked[5]],
+    [ranked[3], ranked[4]],
+  ];
+
   const quartas = [];
 
-  // Quarta 1: 1ºA x 2ºD
-  console.log('Criando Quarta 1: 1ºA x 2ºD');
-  quartas.push(await prisma.match.create({
-    data: {
-      team1Id: first_A.id,
-      team2Id: second_D.id,
-      category,
-      gender,
-      tournamentId,
-      phase: 'quartas'
-    },
-    include: {
-      team1: { include: { club: true } },
-      team2: { include: { club: true } }
-    }
-  }));
-
-  // Quarta 2: 1ºB x 2ºC
-  console.log('Criando Quarta 2: 1ºB x 2ºC');
-  quartas.push(await prisma.match.create({
-    data: {
-      team1Id: first_B.id,
-      team2Id: second_C.id,
-      category,
-      gender,
-      tournamentId,
-      phase: 'quartas'
-    },
-    include: {
-      team1: { include: { club: true } },
-      team2: { include: { club: true } }
-    }
-  }));
-
-  // Quarta 3: 1ºC x 2ºB
-  console.log('Criando Quarta 3: 1ºC x 2ºB');
-  quartas.push(await prisma.match.create({
-    data: {
-      team1Id: first_C.id,
-      team2Id: second_B.id,
-      category,
-      gender,
-      tournamentId,
-      phase: 'quartas'
-    },
-    include: {
-      team1: { include: { club: true } },
-      team2: { include: { club: true } }
-    }
-  }));
-
-  // Quarta 4: 1ºD x 2ºA
-  console.log('Criando Quarta 4: 1ºD x 2ºA');
-  quartas.push(await prisma.match.create({
-    data: {
-      team1Id: first_D.id,
-      team2Id: second_A.id,
-      category,
-      gender,
-      tournamentId,
-      phase: 'quartas'
-    },
-    include: {
-      team1: { include: { club: true } },
-      team2: { include: { club: true } }
-    }
-  }));
+  for (let i = 0; i < matchups.length; i++) {
+    const [teamA, teamB] = matchups[i];
+    console.log(`Criando Quarta ${i+1}: ${teamA.player1}/${teamA.player2} x ${teamB.player1}/${teamB.player2}`);
+    quartas.push(await prisma.match.create({
+      data: {
+        team1Id: teamA.id,
+        team2Id: teamB.id,
+        category,
+        gender,
+        tournamentId,
+        phase: 'quartas'
+      },
+      include: {
+        team1: { include: { club: true } },
+        team2: { include: { club: true } }
+      }
+    }));
+  }
 
   console.log('=== QUARTAS CRIADAS ===');
   quartas.forEach((q, i) => {
@@ -210,10 +171,17 @@ export const getElimination = async (category, gender, tournamentId) => {
   });
 };
 
-export const advanceWinner = async (matchId, score1, score2) => {
+export const advanceWinner = async (matchId, score1, score2, isWo = false, woTeam = null) => {
+  let finalScore1 = score1;
+  let finalScore2 = score2;
+  if (isWo) {
+    finalScore1 = woTeam === 1 ? 0 : 2;
+    finalScore2 = woTeam === 2 ? 0 : 2;
+  }
+
   const match = await prisma.match.update({
     where: { id: matchId },
-    data: { score1, score2, status: 'finalizado' }
+    data: { score1: finalScore1, score2: finalScore2, status: 'finalizado', isWo, woTeam }
   });
 
   if (match.phase === 'quartas') {
@@ -258,7 +226,6 @@ export const advanceWinner = async (matchId, score1, score2) => {
   }
 
   if (match.phase === 'semi') {
-    // Buscar todas as semis finalizadas desta categoria/genero
     const semiFinished = await prisma.match.findMany({
       where: {
         category: match.category,
@@ -270,7 +237,6 @@ export const advanceWinner = async (matchId, score1, score2) => {
       orderBy: { id: 'asc' }
     });
 
-    // Contar total de semis
     const totalSemis = await prisma.match.count({
       where: {
         category: match.category,
@@ -336,4 +302,20 @@ export const advanceWinner = async (matchId, score1, score2) => {
   }
 
   return match;
+};
+
+// Atualiza quais duplas participam de uma partida eliminatória (apenas antes de finalizada)
+export const updateMatchTeams = async (matchId, team1Id, team2Id) => {
+  const match = await prisma.match.findUnique({ where: { id: matchId } });
+  if (!match) throw new Error('Partida não encontrada');
+  if (match.status === 'finalizado') throw new Error('Não é possível editar uma partida já finalizada');
+
+  return await prisma.match.update({
+    where: { id: matchId },
+    data: { team1Id, team2Id },
+    include: {
+      team1: { include: { club: true } },
+      team2: { include: { club: true } }
+    }
+  });
 };

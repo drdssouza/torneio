@@ -47,6 +47,7 @@ router.patch('/matches/:id', matchController.updateMatch);
 router.post('/elimination/generate', eliminationController.generateElimination);
 router.get('/elimination/:category/:gender', eliminationController.getElimination);
 router.patch('/elimination/:id', eliminationController.advanceWinner);
+router.patch('/elimination/:id/teams', eliminationController.updateMatchTeams);
 
 // Ranking
 router.post('/ranking/calculate', rankingController.calculateRanking);

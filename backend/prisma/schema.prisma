@@ -80,6 +80,8 @@ model Match {
   category     String
   gender       String     @default("MASCULINO")
   isBestOf3    Boolean    @default(false)
+  isWo         Boolean    @default(false)
+  woTeam       Int?
   tournamentId Int
   tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 }

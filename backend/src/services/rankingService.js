@@ -9,6 +9,29 @@ const POINTS = {
   campeao: 15     // Ganhou a final
 };
 
+// Retorna número de W.O.s dados por um time em um torneio (fase de grupos)
+async function getWoCount(teamId, tournamentId) {
+  const woAsTeam1 = await prisma.match.count({
+    where: {
+      tournamentId,
+      phase: 'grupos',
+      isWo: true,
+      woTeam: 1,
+      team1Id: teamId
+    }
+  });
+  const woAsTeam2 = await prisma.match.count({
+    where: {
+      tournamentId,
+      phase: 'grupos',
+      isWo: true,
+      woTeam: 2,
+      team2Id: teamId
+    }
+  });
+  return woAsTeam1 + woAsTeam2;
+}
+
 export const calculatePoints = async (tournamentId) => {
   // Resetar pontos
   await prisma.team.updateMany({
@@ -60,13 +83,23 @@ async function calculateCategoryPoints(tournamentId, category, gender) {
     }
   });
 
-  // 3. Dar 2 pontos BASE para TODOS que jogaram na fase de grupos
+  // 3. Dar 2 pontos BASE para todos que jogaram na fase de grupos
+  //    Exceto os que tiveram 3 ou mais W.O.s (não pontuam)
   for (const group of groups) {
     for (const team of group.teams) {
-      await prisma.team.update({
-        where: { id: team.id },
-        data: { points: POINTS.grupos, placement: 'grupos' }
-      });
+      const woCount = await getWoCount(team.id, tournamentId);
+      if (woCount >= 3) {
+        console.log(`[RANKING] ${category} ${gender}: ${team.player1}/${team.player2} NÃO pontua (${woCount} W.O.s)`);
+        await prisma.team.update({
+          where: { id: team.id },
+          data: { points: 0, placement: 'wo_eliminado' }
+        });
+      } else {
+        await prisma.team.update({
+          where: { id: team.id },
+          data: { points: POINTS.grupos, placement: 'grupos' }
+        });
+      }
     }
   }
 
@@ -78,14 +111,17 @@ async function calculateCategoryPoints(tournamentId, category, gender) {
   if (quartas.length > 0) {
     for (const match of quartas) {
       const loserId = match.score1 > match.score2 ? match.team2Id : match.team1Id;
-      await prisma.team.update({
-        where: { id: loserId },
-        data: { points: POINTS.quartas, placement: 'quartas' }
-      });
+      const loserWoCount = await getWoCount(loserId, tournamentId);
+      if (loserWoCount < 3) {
+        await prisma.team.update({
+          where: { id: loserId },
+          data: { points: POINTS.quartas, placement: 'quartas' }
+        });
+      }
     }
   }
 
-  // 5. Semifinais (existem em todas as categorias, incluindo B que pula quartas)
+  // 5. Semifinais
   const semis = await prisma.match.findMany({
     where: { tournamentId, category, gender, phase: 'semi', status: 'finalizado' }
   });
@@ -97,10 +133,13 @@ async function calculateCategoryPoints(tournamentId, category, gender) {
 
   for (const match of semis) {
     const loserId = match.score1 > match.score2 ? match.team2Id : match.team1Id;
-    await prisma.team.update({
-      where: { id: loserId },
-      data: { points: POINTS.semi, placement: 'semi' }
-    });
+    const loserWoCount = await getWoCount(loserId, tournamentId);
+    if (loserWoCount < 3) {
+      await prisma.team.update({
+        where: { id: loserId },
+        data: { points: POINTS.semi, placement: 'semi' }
+      });
+    }
   }
 
   // 6. Final
@@ -116,15 +155,22 @@ async function calculateCategoryPoints(tournamentId, category, gender) {
   const winnerId = final.score1 > final.score2 ? final.team1Id : final.team2Id;
   const loserId = final.score1 > final.score2 ? final.team2Id : final.team1Id;
 
-  await prisma.team.update({
-    where: { id: winnerId },
-    data: { points: POINTS.campeao, placement: 'campeao' }
-  });
+  const winnerWoCount = await getWoCount(winnerId, tournamentId);
+  const loserWoCount = await getWoCount(loserId, tournamentId);
 
-  await prisma.team.update({
-    where: { id: loserId },
-    data: { points: POINTS.finalista, placement: 'finalista' }
-  });
+  if (winnerWoCount < 3) {
+    await prisma.team.update({
+      where: { id: winnerId },
+      data: { points: POINTS.campeao, placement: 'campeao' }
+    });
+  }
+
+  if (loserWoCount < 3) {
+    await prisma.team.update({
+      where: { id: loserId },
+      data: { points: POINTS.finalista, placement: 'finalista' }
+    });
+  }
 
   console.log(`[RANKING] ${category} ${gender}: Torneio completo!`);
 }
@@ -135,7 +181,6 @@ export const getArenaRanking = async (tournamentId) => {
     include: { club: true }
   });
 
-  // Agrupar por arena dinamicamente (suporta qualquer categoria)
   const arenaPoints = {};
 
   teams.forEach(team => {

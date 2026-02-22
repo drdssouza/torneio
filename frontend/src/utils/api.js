@@ -124,11 +124,11 @@ export const api = {
     return res.json();
   },
 
-  updateMatch: async (matchId, score1, score2) => {
+  updateMatch: async (matchId, score1, score2, isWo = false, woTeam = null) => {
     const res = await fetch(`${API_URL}/matches/${matchId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ score1, score2 })
+      body: JSON.stringify({ score1, score2, isWo, woTeam })
     });
     return res.json();
   },
@@ -148,12 +148,25 @@ export const api = {
     return res.json();
   },
 
-  advanceWinner: async (matchId, score1, score2) => {
+  advanceWinner: async (matchId, score1, score2, isWo = false, woTeam = null) => {
     const res = await fetch(`${API_URL}/elimination/${matchId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ score1, score2 })
+      body: JSON.stringify({ score1, score2, isWo, woTeam })
     });
+    return res.json();
+  },
+
+  updateEliminationTeams: async (matchId, team1Id, team2Id) => {
+    const res = await fetch(`${API_URL}/elimination/${matchId}/teams`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ team1Id, team2Id })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error);
+    }
     return res.json();
   }
 };
