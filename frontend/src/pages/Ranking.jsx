@@ -17,7 +17,7 @@ export default function Ranking() {
 
   const loadRanking = async () => {
     const data = await api.getRanking();
-    setRanking(data);
+    setRanking(Array.isArray(data) ? data : []);
   };
 
   const handleCalculate = async () => {
@@ -141,15 +141,20 @@ export default function Ranking() {
                 <div className="border-t border-gray-200 bg-gray-50 p-6">
                   <h3 className="font-semibold text-gray-900 mb-4">Detalhamento por Categoria</h3>
                   
-                  {['E', 'D', 'C'].map(category => (
+                  {['E', 'D', 'C', 'B'].map(category => (
                     <div key={category} className="mb-6 last:mb-0">
-                      <h4 className="text-sm font-medium text-gray-700 mb-3">Categoria {category}</h4>
-                      
-                      {['MASCULINO', 'FEMININO'].map(gender => {
+                      <h4 className="text-sm font-medium text-gray-700 mb-3">
+                        Categoria {category}
+                        {category === 'B' && (
+                          <span className="ml-2 text-xs text-gray-400 font-normal">Final: Melhor de 3 Sets</span>
+                        )}
+                      </h4>
+
+                      {(category === 'B' ? ['MASCULINO'] : ['MASCULINO', 'FEMININO']).map(gender => {
                         const teams = detailedData[club.clubName].filter(
                           t => t.category === category && t.gender === gender
                         );
-                        
+
                         if (teams.length === 0) return null;
 
                         return (
