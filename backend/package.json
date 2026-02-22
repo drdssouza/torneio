@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "node src/server.js",
+    "start": "npx prisma migrate deploy && node src/server.js",
     "postdeploy": "npx prisma db seed",
     "dev": "node src/server.js",
     "db:migrate": "npx prisma migrate dev",
