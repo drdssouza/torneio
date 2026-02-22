@@ -107,6 +107,7 @@ const TORNEIO_DATA = {
 async function executeSeedReal() {
   console.log('🌱 [SEED REAL] Iniciando seed com dados reais do torneio...');
 
+  const adminUsername = process.env.ADMIN_EMAIL || 'admin_torneio';
   const adminPassword = process.env.ADMIN_PASSWORD;
   if (!adminPassword) {
     throw new Error('ADMIN_PASSWORD não configurado');
@@ -122,11 +123,11 @@ async function executeSeedReal() {
   await prisma.admin.deleteMany();
 
   // Criar admin
-  console.log('[SEED REAL] Criando admin...');
+  console.log('[SEED REAL] Criando admin com username:', adminUsername);
   const senhaHash = await bcrypt.hash(adminPassword, 10);
   const admin = await prisma.admin.create({
     data: {
-      username: 'admin_torneio',
+      username: adminUsername,
       password: senhaHash
     }
   });
