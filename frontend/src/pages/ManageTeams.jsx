@@ -208,7 +208,7 @@ export default function ManageTeams() {
 
         <div className="mb-6 flex items-center justify-between">
           <p className="text-sm text-gray-500">
-            {teams.length}/16 duplas cadastradas
+            {teams.length}/{category === 'B' ? 4 : 16} duplas cadastradas
           </p>
 
           {groupsGenerated && (
@@ -314,7 +314,7 @@ export default function ManageTeams() {
         )}
 
         {/* Botão de Gerar Grupos */}
-        {teams.length === 16 && !groupsGenerated && (
+        {teams.length === (category === 'B' ? 4 : 16) && !groupsGenerated && (
           <div className="mt-12 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-8 text-center">
             <div className="mb-4">
               <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-full mb-4">
@@ -324,8 +324,10 @@ export default function ManageTeams() {
                 Pronto para Gerar os Grupos!
               </h3>
               <p className="text-sm text-gray-600 mb-6">
-                Todas as 16 duplas foram cadastradas. O sorteio será aleatório<br />
-                respeitando a regra de 1 dupla por arena em cada grupo.
+                {category === 'B'
+                  ? 'As 4 duplas foram cadastradas. Será gerado 1 grupo único com todos contra todos.'
+                  : <>Todas as 16 duplas foram cadastradas. O sorteio será aleatório<br />respeitando a regra de 1 dupla por arena em cada grupo.</>
+                }
               </p>
             </div>
             

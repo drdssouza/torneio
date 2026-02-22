@@ -4,16 +4,16 @@ const prisma = new PrismaClient();
 export const generateGroups = async (category, gender, tournamentId) => {
   try {
     console.log(`[GROUPS] Iniciando geração de grupos - ${category} ${gender} Tournament ${tournamentId}`);
-    
+
     // Limpar grupos e matches anteriores
     console.log('[GROUPS] Limpando matches anteriores...');
-    await prisma.match.deleteMany({ 
-      where: { 
-        category, 
-        gender, 
+    await prisma.match.deleteMany({
+      where: {
+        category,
+        gender,
         tournamentId,
-        phase: 'grupos' 
-      } 
+        phase: 'grupos'
+      }
     });
 
     console.log('[GROUPS] Resetando times...');
@@ -34,6 +34,58 @@ export const generateGroups = async (category, gender, tournamentId) => {
 
     console.log(`[GROUPS] Encontradas ${teams.length} duplas`);
 
+    // Categoria B: formato especial - 1 grupo único com 4 duplas
+    if (category === 'B') {
+      if (teams.length !== 4) {
+        throw new Error(`Categoria B precisa ter exatamente 4 duplas. Atualmente há ${teams.length} duplas.`);
+      }
+
+      const group = await prisma.group.create({
+        data: { name: 'A', category, gender, tournamentId }
+      });
+
+      for (const team of teams) {
+        await prisma.team.update({
+          where: { id: team.id },
+          data: { groupId: group.id }
+        });
+      }
+
+      const teamsInGroup = await prisma.team.findMany({
+        where: { groupId: group.id }
+      });
+
+      for (let i = 0; i < teamsInGroup.length; i++) {
+        for (let j = i + 1; j < teamsInGroup.length; j++) {
+          await prisma.match.create({
+            data: {
+              groupId: group.id,
+              team1Id: teamsInGroup[i].id,
+              team2Id: teamsInGroup[j].id,
+              category,
+              gender,
+              tournamentId,
+              phase: 'grupos'
+            }
+          });
+        }
+      }
+
+      return await prisma.group.findMany({
+        where: { category, gender, tournamentId },
+        include: {
+          teams: { include: { club: true } },
+          matches: {
+            include: {
+              team1: { include: { club: true } },
+              team2: { include: { club: true } }
+            }
+          }
+        }
+      });
+    }
+
+    // Categorias normais (E, D, C): exigem exatamente 16 duplas
     if (teams.length !== 16) {
       throw new Error(`É necessário ter exatamente 16 duplas cadastradas. Atualmente há ${teams.length} duplas.`);
     }
@@ -45,7 +97,7 @@ export const generateGroups = async (category, gender, tournamentId) => {
       teamsByClub[team.clubId].push(team);
     });
 
-    console.log('[GROUPS] Times por clube:', Object.keys(teamsByClub).map(id => 
+    console.log('[GROUPS] Times por clube:', Object.keys(teamsByClub).map(id =>
       `Clube ${id}: ${teamsByClub[id].length} times`
     ).join(', '));
 
@@ -65,28 +117,28 @@ export const generateGroups = async (category, gender, tournamentId) => {
     // Distribuir times nos grupos
     const clubIds = Object.keys(teamsByClub).map(id => parseInt(id));
     console.log('[GROUPS] IDs dos clubes:', clubIds);
-    
+
     for (let groupIndex = 0; groupIndex < 4; groupIndex++) {
       console.log(`[GROUPS] Populando Grupo ${groupNames[groupIndex]}...`);
-      
+
       // Embaralhar ordem dos clubes para cada grupo
       const shuffledClubIds = [...clubIds].sort(() => Math.random() - 0.5);
-      
+
       for (const clubId of shuffledClubIds) {
         const availableTeams = teamsByClub[clubId].filter(t => !t.groupId);
-        
+
         if (availableTeams.length > 0) {
           // Escolher uma dupla ALEATÓRIA
           const randomIndex = Math.floor(Math.random() * availableTeams.length);
           const team = availableTeams[randomIndex];
-          
+
           console.log(`[GROUPS]   Adicionando time ${team.player1}/${team.player2} (Clube ${clubId})`);
-          
+
           await prisma.team.update({
             where: { id: team.id },
             data: { groupId: groups[groupIndex].id }
           });
-          
+
           // Importante: marcar o time como já alocado
           team.groupId = groups[groupIndex].id;
         } else {
@@ -153,7 +205,7 @@ export const generateGroups = async (category, gender, tournamentId) => {
 export const getGroups = async (category, gender, tournamentId) => {
   try {
     console.log(`[GROUPS] Buscando grupos - ${category} ${gender} Tournament ${tournamentId}`);
-    
+
     const groups = await prisma.group.findMany({
       where: { category, gender, tournamentId },
       include: {
@@ -175,7 +227,7 @@ export const getGroups = async (category, gender, tournamentId) => {
 
     console.log(`[GROUPS] Encontrados ${groups.length} grupos`);
     return groups;
-    
+
   } catch (error) {
     console.error('[GROUPS] Erro ao buscar grupos:', error);
     throw error;

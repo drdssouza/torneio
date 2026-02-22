@@ -79,6 +79,7 @@ model Match {
   phase        String     @default("grupos")
   category     String
   gender       String     @default("MASCULINO")
+  isBestOf3    Boolean    @default(false)
   tournamentId Int
   tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 }

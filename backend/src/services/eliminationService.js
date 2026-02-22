@@ -3,13 +3,13 @@ const prisma = new PrismaClient();
 
 export const generateElimination = async (category, gender, tournamentId) => {
   // Limpar eliminatórias anteriores
-  await prisma.match.deleteMany({ 
-    where: { 
+  await prisma.match.deleteMany({
+    where: {
       category,
       gender,
       tournamentId,
-      phase: { in: ['quartas', 'semi', 'final'] } 
-    } 
+      phase: { in: ['quartas', 'semi', 'final'] }
+    }
   });
 
   // Buscar grupos com classificação
@@ -26,6 +26,45 @@ export const generateElimination = async (category, gender, tournamentId) => {
     orderBy: { name: 'asc' }
   });
 
+  // ===== CATEGORIA B: formato especial =====
+  // 1 grupo único, 1º vai direto à final, 2º x 3º na semi, final melhor de 3 sets
+  if (category === 'B') {
+    if (groups.length !== 1) {
+      throw new Error('Categoria B deve ter exatamente 1 grupo');
+    }
+
+    const teams = groups[0].teams;
+
+    if (teams.length < 3) {
+      throw new Error('Categoria B precisa ter pelo menos 3 duplas no grupo para gerar eliminatórias');
+    }
+
+    const second = teams[1];
+    const third = teams[2];
+
+    console.log('=== CATEGORIA B - ELIMINATÓRIAS ===');
+    console.log('1º (bye → final):', teams[0].player1, '/', teams[0].player2);
+    console.log('Semi: 2º', second.player1, '/', second.player2, 'x 3º', third.player1, '/', third.player2);
+
+    const semi = await prisma.match.create({
+      data: {
+        team1Id: second.id,
+        team2Id: third.id,
+        category,
+        gender,
+        tournamentId,
+        phase: 'semi'
+      },
+      include: {
+        team1: { include: { club: true } },
+        team2: { include: { club: true } }
+      }
+    });
+
+    return [semi];
+  }
+
+  // ===== CATEGORIAS NORMAIS (E, D, C): 4 grupos =====
   if (groups.length !== 4) {
     throw new Error('É necessário ter 4 grupos gerados primeiro');
   }
@@ -70,7 +109,7 @@ export const generateElimination = async (category, gender, tournamentId) => {
     first_C.id, second_C.id, first_D.id, second_D.id
   ];
   const uniqueIds = new Set(allIds);
-  
+
   if (uniqueIds.size !== 8) {
     console.error('ERRO: IDs duplicados detectados!', allIds);
     throw new Error('Erro: duplas duplicadas nas classificações. Verifique os grupos.');
@@ -78,7 +117,7 @@ export const generateElimination = async (category, gender, tournamentId) => {
 
   // Criar as quartas de final
   const quartas = [];
-  
+
   // Quarta 1: 1ºA x 2ºD
   console.log('Criando Quarta 1: 1ºA x 2ºD');
   quartas.push(await prisma.match.create({
@@ -157,7 +196,7 @@ export const generateElimination = async (category, gender, tournamentId) => {
 
 export const getElimination = async (category, gender, tournamentId) => {
   return await prisma.match.findMany({
-    where: { 
+    where: {
       category,
       gender,
       tournamentId,
@@ -179,7 +218,7 @@ export const advanceWinner = async (matchId, score1, score2) => {
 
   if (match.phase === 'quartas') {
     const quartasFinished = await prisma.match.findMany({
-      where: { 
+      where: {
         category: match.category,
         gender: match.gender,
         tournamentId: match.tournamentId,
@@ -190,7 +229,7 @@ export const advanceWinner = async (matchId, score1, score2) => {
     });
 
     if (quartasFinished.length === 4) {
-      const winners = quartasFinished.map(m => 
+      const winners = quartasFinished.map(m =>
         m.score1 > m.score2 ? m.team1Id : m.team2Id
       );
 
@@ -219,8 +258,9 @@ export const advanceWinner = async (matchId, score1, score2) => {
   }
 
   if (match.phase === 'semi') {
+    // Buscar todas as semis finalizadas desta categoria/genero
     const semiFinished = await prisma.match.findMany({
-      where: { 
+      where: {
         category: match.category,
         gender: match.gender,
         tournamentId: match.tournamentId,
@@ -230,21 +270,68 @@ export const advanceWinner = async (matchId, score1, score2) => {
       orderBy: { id: 'asc' }
     });
 
-    if (semiFinished.length === 2) {
-      const winners = semiFinished.map(m => 
-        m.score1 > m.score2 ? m.team1Id : m.team2Id
-      );
+    // Contar total de semis
+    const totalSemis = await prisma.match.count({
+      where: {
+        category: match.category,
+        gender: match.gender,
+        tournamentId: match.tournamentId,
+        phase: 'semi'
+      }
+    });
 
-      await prisma.match.create({
-        data: {
-          team1Id: winners[0],
-          team2Id: winners[1],
-          category: match.category,
-          gender: match.gender,
-          tournamentId: match.tournamentId,
-          phase: 'final'
-        }
-      });
+    if (semiFinished.length === totalSemis) {
+      // Categoria B: 1 semi → final com 1º lugar do grupo + isBestOf3
+      if (match.category === 'B') {
+        const group = await prisma.group.findFirst({
+          where: {
+            category: match.category,
+            gender: match.gender,
+            tournamentId: match.tournamentId
+          },
+          include: {
+            teams: {
+              orderBy: [
+                { wins: 'desc' },
+                { gamesWon: 'desc' }
+              ]
+            }
+          }
+        });
+
+        const firstPlace = group.teams[0];
+        const semiWinner = match.score1 > match.score2 ? match.team1Id : match.team2Id;
+
+        console.log('Categoria B - Criando final:', firstPlace.player1, '/', firstPlace.player2, '(1º lugar) x vencedor da semi');
+
+        await prisma.match.create({
+          data: {
+            team1Id: firstPlace.id,
+            team2Id: semiWinner,
+            category: match.category,
+            gender: match.gender,
+            tournamentId: match.tournamentId,
+            phase: 'final',
+            isBestOf3: true
+          }
+        });
+      } else {
+        // Categorias normais: 2 semis → final
+        const winners = semiFinished.map(m =>
+          m.score1 > m.score2 ? m.team1Id : m.team2Id
+        );
+
+        await prisma.match.create({
+          data: {
+            team1Id: winners[0],
+            team2Id: winners[1],
+            category: match.category,
+            gender: match.gender,
+            tournamentId: match.tournamentId,
+            phase: 'final'
+          }
+        });
+      }
     }
   }
 

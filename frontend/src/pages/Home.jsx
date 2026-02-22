@@ -13,6 +13,7 @@ export default function Home() {
   
   const categories = ['E', 'D', 'C'];
   const genders = ['MASCULINO', 'FEMININO'];
+  const categoryBGender = 'MASCULINO';
 
   useEffect(() => {
     loadTournaments();
@@ -182,12 +183,12 @@ export default function Home() {
           {categories.map((cat) => (
             <div key={cat}>
               <h2 className="text-lg font-semibold text-gray-900 mb-6">Categoria {cat}</h2>
-              
+
               <div className="grid grid-cols-2 gap-6">
                 {genders.map((gender) => (
                   <div key={gender} className="border border-gray-200 rounded-lg p-6">
                     <p className="text-sm font-medium text-gray-500 mb-4">{gender}</p>
-                    
+
                     <div className="space-y-2">
                       <Link
                         to={`/categoria/${cat}/${gender}`}
@@ -195,7 +196,7 @@ export default function Home() {
                       >
                         Ver Torneio
                       </Link>
-                      
+
                       {isAuthenticated && (
                         <button
                           onClick={() => handleManageTeams(cat, gender)}
@@ -210,6 +211,43 @@ export default function Home() {
               </div>
             </div>
           ))}
+
+          {/* Categoria B - formato especial, apenas masculino */}
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <h2 className="text-lg font-semibold text-gray-900">Categoria B</h2>
+              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full border border-gray-200">
+                Final: Melhor de 3 Sets
+              </span>
+            </div>
+            <p className="text-sm text-gray-500 mb-6">
+              Todos contra todos • 1º lugar vai direto à final • 2º × 3º disputam a semifinal
+            </p>
+
+            <div className="max-w-xs">
+              <div className="border border-gray-200 rounded-lg p-6">
+                <p className="text-sm font-medium text-gray-500 mb-4">MASCULINO</p>
+
+                <div className="space-y-2">
+                  <Link
+                    to={`/categoria/B/${categoryBGender}`}
+                    className="block w-full bg-gray-900 text-white px-4 py-3 rounded text-sm font-medium hover:bg-gray-800 transition text-center"
+                  >
+                    Ver Torneio
+                  </Link>
+
+                  {isAuthenticated && (
+                    <button
+                      onClick={() => handleManageTeams('B', categoryBGender)}
+                      className="w-full border border-gray-300 text-gray-700 px-4 py-3 rounded text-sm font-medium hover:bg-gray-50 transition"
+                    >
+                      Gerenciar Duplas
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

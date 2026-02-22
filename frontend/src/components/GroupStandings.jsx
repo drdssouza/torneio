@@ -2,7 +2,8 @@ import { useStore } from '../store/useStore';
 import { Info } from 'lucide-react';
 
 export default function GroupStandings() {
-  const { groups } = useStore();
+  const { groups, category } = useStore();
+  const isCategoryB = category === 'B';
 
   if (groups.length === 0) {
     return (
@@ -25,16 +26,23 @@ export default function GroupStandings() {
               <li>2º - Maior saldo de games (GW - GL)</li>
               <li>3º - Maior número de games vencidos</li>
             </ol>
+            {isCategoryB && (
+              <p className="text-xs text-blue-700 mt-2 font-medium">
+                Categoria B: 1º vai direto à final • 2º e 3º disputam a semifinal
+              </p>
+            )}
           </div>
         </div>
       </div>
 
       {/* Grupos */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className={`grid gap-8 ${isCategoryB ? 'grid-cols-1 max-w-xl mx-auto' : 'grid-cols-1 md:grid-cols-2'}`}>
         {groups.map((group) => (
           <div key={group.id} className="border border-gray-200 rounded-lg overflow-hidden">
             <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
-              <h3 className="font-semibold text-gray-900">Grupo {group.name}</h3>
+              <h3 className="font-semibold text-gray-900">
+                {isCategoryB ? 'Classificação Geral' : `Grupo ${group.name}`}
+              </h3>
             </div>
 
             <div className="p-6">
@@ -50,32 +58,44 @@ export default function GroupStandings() {
                   </tr>
                 </thead>
                 <tbody>
-                  {group.teams.map((team, i) => (
-                    <tr
-                      key={team.id}
-                      className={`border-b border-gray-50 ${
-                        i < 2 ? 'bg-green-50' : ''
-                      }`}
-                    >
-                      <td className="py-3 text-sm text-gray-900 font-medium">
-                        {i + 1}
-                        {i < 2 && <span className="ml-1 text-green-600">✓</span>}
-                      </td>
-                      <td className="py-3">
-                        <div className="text-sm text-gray-900 font-medium">
-                          {team.player1} / {team.player2}
-                        </div>
-                        <div className="text-xs text-gray-500">{team.club.name}</div>
-                      </td>
-                      <td className="py-3 text-sm text-gray-900 text-center font-semibold">{team.wins}</td>
-                      <td className="py-3 text-sm text-gray-900 text-center">{team.gamesWon}</td>
-                      <td className="py-3 text-sm text-gray-900 text-center">{team.gamesLost}</td>
-                      <td className="py-3 text-sm text-gray-900 text-center font-medium">
-                        {team.gamesWon - team.gamesLost > 0 ? '+' : ''}
-                        {team.gamesWon - team.gamesLost}
-                      </td>
-                    </tr>
-                  ))}
+                  {group.teams.map((team, i) => {
+                    const rowBg = isCategoryB
+                      ? (i === 0 ? 'bg-yellow-50' : i < 3 ? 'bg-green-50' : '')
+                      : (i < 2 ? 'bg-green-50' : '');
+
+                    return (
+                      <tr
+                        key={team.id}
+                        className={`border-b border-gray-50 ${rowBg}`}
+                      >
+                        <td className="py-3 text-sm text-gray-900 font-medium">
+                          {i + 1}
+                          {isCategoryB && i === 0 && (
+                            <span className="ml-1 text-yellow-600 text-xs font-normal">Final</span>
+                          )}
+                          {isCategoryB && (i === 1 || i === 2) && (
+                            <span className="ml-1 text-green-600">✓</span>
+                          )}
+                          {!isCategoryB && i < 2 && (
+                            <span className="ml-1 text-green-600">✓</span>
+                          )}
+                        </td>
+                        <td className="py-3">
+                          <div className="text-sm text-gray-900 font-medium">
+                            {team.player1} / {team.player2}
+                          </div>
+                          <div className="text-xs text-gray-500">{team.club.name}</div>
+                        </td>
+                        <td className="py-3 text-sm text-gray-900 text-center font-semibold">{team.wins}</td>
+                        <td className="py-3 text-sm text-gray-900 text-center">{team.gamesWon}</td>
+                        <td className="py-3 text-sm text-gray-900 text-center">{team.gamesLost}</td>
+                        <td className="py-3 text-sm text-gray-900 text-center font-medium">
+                          {team.gamesWon - team.gamesLost > 0 ? '+' : ''}
+                          {team.gamesWon - team.gamesLost}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -85,10 +105,18 @@ export default function GroupStandings() {
 
       {/* Legenda */}
       <div className="border-t border-gray-200 pt-4">
-        <p className="text-xs text-gray-500">
-          <span className="font-medium">Legenda:</span> V = Vitórias • GW = Games Vencidos • GL = Games Lost (Perdidos) • 
-          <span className="text-green-600 ml-2">✓ Classificados para as eliminatórias</span>
-        </p>
+        {isCategoryB ? (
+          <p className="text-xs text-gray-500">
+            <span className="font-medium">Legenda:</span> V = Vitórias • GW = Games Vencidos • GL = Games Perdidos •{' '}
+            <span className="text-yellow-600 ml-1">1º → Final direta</span> •{' '}
+            <span className="text-green-600 ml-1">✓ 2º e 3º → Semifinal</span>
+          </p>
+        ) : (
+          <p className="text-xs text-gray-500">
+            <span className="font-medium">Legenda:</span> V = Vitórias • GW = Games Vencidos • GL = Games Lost (Perdidos) •{' '}
+            <span className="text-green-600 ml-2">✓ Classificados para as eliminatórias</span>
+          </p>
+        )}
       </div>
     </div>
   );
