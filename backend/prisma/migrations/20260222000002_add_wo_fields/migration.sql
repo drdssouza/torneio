@@ -1,3 +1,0 @@
--- AlterTable
-ALTER TABLE "Match" ADD COLUMN "isWo" BOOLEAN NOT NULL DEFAULT false;
-ALTER TABLE "Match" ADD COLUMN "woTeam" INTEGER;
