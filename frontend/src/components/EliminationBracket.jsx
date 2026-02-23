@@ -1,30 +1,26 @@
 import { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { api } from '../utils/api';
-import { Trophy, Edit2, Users, AlertTriangle } from 'lucide-react';
+import { Trophy, Edit2, Users, AlertTriangle, ChevronRight } from 'lucide-react';
 
 export default function EliminationBracket({ onUpdate }) {
   const { elimination, isAuthenticated, category, groups } = useStore();
   const [localScores, setLocalScores] = useState({});
   const [editingMatches, setEditingMatches] = useState(new Set());
-  const [woModal, setWoModal] = useState(null); // { matchId, team1, team2 }
-  const [editTeamsModal, setEditTeamsModal] = useState(null); // { match }
+  const [woModal, setWoModal] = useState(null);
+  const [editTeamsModal, setEditTeamsModal] = useState(null);
   const [editTeamsSelection, setEditTeamsSelection] = useState({ team1Id: '', team2Id: '' });
 
   const quartas = elimination.filter(m => m.phase === 'quartas');
   const semi = elimination.filter(m => m.phase === 'semi');
   const final = elimination.filter(m => m.phase === 'final');
 
-  // Todas as duplas dos grupos para o seletor de edição de confrontos
   const allGroupTeams = groups.flatMap(g => g.teams || []);
 
   const handleScoreChange = (matchId, field, value) => {
     setLocalScores(prev => ({
       ...prev,
-      [matchId]: {
-        ...prev[matchId],
-        [field]: value
-      }
+      [matchId]: { ...prev[matchId], [field]: value }
     }));
   };
 
@@ -33,36 +29,18 @@ export default function EliminationBracket({ onUpdate }) {
       alert('Você precisa estar logado como admin!');
       return;
     }
-
     const scores = localScores[matchId];
     if (!scores || scores.score1 === '' || scores.score2 === '' ||
         scores.score1 === undefined || scores.score2 === undefined) {
       alert('Preencha ambos os placares');
       return;
     }
-
     try {
       await api.advanceWinner(matchId, parseInt(scores.score1), parseInt(scores.score2));
-
-      setEditingMatches(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(matchId);
-        return newSet;
-      });
-
-      setLocalScores(prev => {
-        const newScores = { ...prev };
-        delete newScores[matchId];
-        return newScores;
-      });
-
+      setEditingMatches(prev => { const s = new Set(prev); s.delete(matchId); return s; });
+      setLocalScores(prev => { const n = { ...prev }; delete n[matchId]; return n; });
       onUpdate();
-
-      try {
-        await api.calculateRanking();
-      } catch (err) {
-        console.log('Erro ao calcular ranking:', err);
-      }
+      try { await api.calculateRanking(); } catch (err) { console.log('Erro ao calcular ranking:', err); }
     } catch (error) {
       alert('Erro ao salvar placar');
     }
@@ -74,11 +52,7 @@ export default function EliminationBracket({ onUpdate }) {
       await api.advanceWinner(matchId, null, null, true, woTeam);
       setWoModal(null);
       onUpdate();
-      try {
-        await api.calculateRanking();
-      } catch (err) {
-        console.log('Erro ao calcular ranking:', err);
-      }
+      try { await api.calculateRanking(); } catch (err) { console.log('Erro ao calcular ranking:', err); }
     } catch (error) {
       alert('Erro ao registrar W.O.');
     }
@@ -86,14 +60,8 @@ export default function EliminationBracket({ onUpdate }) {
 
   const handleEditTeams = async () => {
     const { team1Id, team2Id } = editTeamsSelection;
-    if (!team1Id || !team2Id) {
-      alert('Selecione as duas duplas');
-      return;
-    }
-    if (team1Id === team2Id) {
-      alert('As duas duplas devem ser diferentes');
-      return;
-    }
+    if (!team1Id || !team2Id) { alert('Selecione as duas duplas'); return; }
+    if (team1Id === team2Id) { alert('As duas duplas devem ser diferentes'); return; }
     try {
       await api.updateEliminationTeams(editTeamsModal.match.id, parseInt(team1Id), parseInt(team2Id));
       setEditTeamsModal(null);
@@ -115,16 +83,8 @@ export default function EliminationBracket({ onUpdate }) {
   };
 
   const cancelEditing = (matchId) => {
-    setEditingMatches(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(matchId);
-      return newSet;
-    });
-    setLocalScores(prev => {
-      const newScores = { ...prev };
-      delete newScores[matchId];
-      return newScores;
-    });
+    setEditingMatches(prev => { const s = new Set(prev); s.delete(matchId); return s; });
+    setLocalScores(prev => { const n = { ...prev }; delete n[matchId]; return n; });
   };
 
   const openEditTeams = (match) => {
@@ -133,12 +93,14 @@ export default function EliminationBracket({ onUpdate }) {
   };
 
   const renderMatch = (match) => {
+    if (!match) return null;
     const isEditing = editingMatches.has(match.id);
     const isFinalized = match.status === 'finalizado' && !isEditing;
     const currentScores = localScores[match.id] || {};
     const isBestOf3 = match.isBestOf3;
     const isWo = match.isWo;
     const woTeam = match.woTeam;
+    const canEditTeams = !isFinalized && match.phase !== 'final';
 
     return (
       <div key={match.id} className={`border rounded-lg p-4 bg-white ${isWo && isFinalized ? 'border-amber-300' : 'border-gray-200'}`}>
@@ -152,52 +114,50 @@ export default function EliminationBracket({ onUpdate }) {
         )}
 
         <div className="space-y-3">
+          {/* Team 1 */}
           <div className="flex items-center justify-between">
-            <div>
-              <p className={`text-sm font-medium ${isFinalized && isWo && woTeam === 1 ? 'text-red-400 line-through' : isFinalized && match.score1 > match.score2 ? 'text-gray-900' : 'text-gray-700'}`}>
+            <div className="flex-1 min-w-0 pr-2">
+              <p className={`text-sm font-medium truncate ${isFinalized && isWo && woTeam === 1 ? 'text-red-400 line-through' : isFinalized && match.score1 > match.score2 ? 'text-gray-900 font-semibold' : 'text-gray-700'}`}>
                 {match.team1.player1} / {match.team1.player2}
               </p>
-              <p className="text-xs text-gray-500">{match.team1.club.name}</p>
+              <p className="text-xs text-gray-500 truncate">{match.team1.club.name}</p>
             </div>
             {isFinalized ? (
-              <span className={`text-lg font-semibold ${match.score1 > match.score2 ? 'text-gray-900' : 'text-gray-400'}`}>
+              <span className={`text-lg font-semibold flex-shrink-0 ${match.score1 > match.score2 ? 'text-gray-900' : 'text-gray-400'}`}>
                 {isWo && woTeam === 1 ? 'W.O.' : match.score1}
               </span>
             ) : (
               isAuthenticated && (
                 <input
-                  type="number"
-                  min="0"
-                  max={isBestOf3 ? 2 : undefined}
-                  placeholder="0"
+                  type="number" min="0" max={isBestOf3 ? 2 : undefined} placeholder="0"
                   value={currentScores.score1 || ''}
-                  className="w-12 px-2 py-1 border border-gray-300 rounded text-center text-sm focus:outline-none focus:border-gray-900"
+                  className="w-12 px-2 py-1 border border-gray-300 rounded text-center text-sm focus:outline-none focus:border-gray-900 flex-shrink-0"
                   onChange={(e) => handleScoreChange(match.id, 'score1', e.target.value)}
                 />
               )
             )}
           </div>
 
+          <div className="border-t border-gray-100" />
+
+          {/* Team 2 */}
           <div className="flex items-center justify-between">
-            <div>
-              <p className={`text-sm font-medium ${isFinalized && isWo && woTeam === 2 ? 'text-red-400 line-through' : isFinalized && match.score2 > match.score1 ? 'text-gray-900' : 'text-gray-700'}`}>
+            <div className="flex-1 min-w-0 pr-2">
+              <p className={`text-sm font-medium truncate ${isFinalized && isWo && woTeam === 2 ? 'text-red-400 line-through' : isFinalized && match.score2 > match.score1 ? 'text-gray-900 font-semibold' : 'text-gray-700'}`}>
                 {match.team2.player1} / {match.team2.player2}
               </p>
-              <p className="text-xs text-gray-500">{match.team2.club.name}</p>
+              <p className="text-xs text-gray-500 truncate">{match.team2.club.name}</p>
             </div>
             {isFinalized ? (
-              <span className={`text-lg font-semibold ${match.score2 > match.score1 ? 'text-gray-900' : 'text-gray-400'}`}>
+              <span className={`text-lg font-semibold flex-shrink-0 ${match.score2 > match.score1 ? 'text-gray-900' : 'text-gray-400'}`}>
                 {isWo && woTeam === 2 ? 'W.O.' : match.score2}
               </span>
             ) : (
               isAuthenticated && (
                 <input
-                  type="number"
-                  min="0"
-                  max={isBestOf3 ? 2 : undefined}
-                  placeholder="0"
+                  type="number" min="0" max={isBestOf3 ? 2 : undefined} placeholder="0"
                   value={currentScores.score2 || ''}
-                  className="w-12 px-2 py-1 border border-gray-300 rounded text-center text-sm focus:outline-none focus:border-gray-900"
+                  className="w-12 px-2 py-1 border border-gray-300 rounded text-center text-sm focus:outline-none focus:border-gray-900 flex-shrink-0"
                   onChange={(e) => handleScoreChange(match.id, 'score2', e.target.value)}
                 />
               )
@@ -207,12 +167,11 @@ export default function EliminationBracket({ onUpdate }) {
 
         {isFinalized && isWo && (
           <div className="mt-2 flex justify-center">
-            <span className="text-xs bg-amber-100 text-amber-700 px-3 py-1 rounded-full font-medium">
-              W.O.
-            </span>
+            <span className="text-xs bg-amber-100 text-amber-700 px-3 py-1 rounded-full font-medium">W.O.</span>
           </div>
         )}
 
+        {/* Action buttons */}
         {isFinalized && isAuthenticated ? (
           <button
             onClick={() => startEditing(match)}
@@ -246,8 +205,7 @@ export default function EliminationBracket({ onUpdate }) {
                   </button>
                 )}
               </div>
-              {/* Editar confronto só disponível nas quartas antes de finalizar */}
-              {match.phase === 'quartas' && (
+              {canEditTeams && (
                 <button
                   onClick={() => openEditTeams(match)}
                   className="w-full border border-blue-200 text-blue-700 py-2 rounded text-sm hover:bg-blue-50 transition flex items-center justify-center gap-2"
@@ -279,9 +237,131 @@ export default function EliminationBracket({ onUpdate }) {
     );
   }
 
+  // ===== CATEGORIA B: Final direta 1º × 2º =====
+  const renderCategoryBBracket = () => (
+    <div>
+      {final.length > 0 && (
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <h3 className="text-lg font-semibold text-gray-900">Final</h3>
+            {final[0]?.isBestOf3 && (
+              <span className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded-full border border-amber-200 font-medium">
+                Melhor de 3 Sets
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-gray-500 mb-5">
+            1º lugar × 2º lugar
+          </p>
+          <div className="max-w-sm">
+            {renderMatch(final[0])}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  // ===== CATEGORIAS E, D, C: Quartas → Semis → Final =====
+  const renderNormalBracket = () => (
+    <div className="space-y-12">
+      {/* Quartas de Final */}
+      {quartas.length > 0 && (
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-6">Quartas de Final</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Chave 1: Q1 + Q2 → Semi 1 */}
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1 rounded-full">
+                  Chave 1
+                </span>
+                <ChevronRight className="w-4 h-4 text-gray-300" />
+                <span className="text-xs text-gray-400">Semifinal 1</span>
+              </div>
+              <div className="space-y-4 border-l-4 border-blue-200 pl-4">
+                {quartas[0] && renderMatch(quartas[0])}
+                {quartas[1] && renderMatch(quartas[1])}
+              </div>
+            </div>
+
+            {/* Chave 2: Q3 + Q4 → Semi 2 */}
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-xs font-semibold text-violet-700 bg-violet-50 border border-violet-200 px-3 py-1 rounded-full">
+                  Chave 2
+                </span>
+                <ChevronRight className="w-4 h-4 text-gray-300" />
+                <span className="text-xs text-gray-400">Semifinal 2</span>
+              </div>
+              <div className="space-y-4 border-l-4 border-violet-200 pl-4">
+                {quartas[2] && renderMatch(quartas[2])}
+                {quartas[3] && renderMatch(quartas[3])}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Semifinal */}
+      {semi.length > 0 && (
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-6">Semifinal</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {semi[0] && (
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1 rounded-full">
+                    Semifinal 1
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-gray-300" />
+                  <span className="text-xs text-gray-400">Final</span>
+                </div>
+                <div className="border-l-4 border-blue-200 pl-4">
+                  {renderMatch(semi[0])}
+                </div>
+              </div>
+            )}
+
+            {semi[1] && (
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-xs font-semibold text-violet-700 bg-violet-50 border border-violet-200 px-3 py-1 rounded-full">
+                    Semifinal 2
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-gray-300" />
+                  <span className="text-xs text-gray-400">Final</span>
+                </div>
+                <div className="border-l-4 border-violet-200 pl-4">
+                  {renderMatch(semi[1])}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Final */}
+      {final.length > 0 && (
+        <div>
+          <div className="flex items-center gap-3 mb-6">
+            <h3 className="text-lg font-semibold text-gray-900">Final</h3>
+            {final[0]?.isBestOf3 && (
+              <span className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded-full border border-amber-200 font-medium">
+                Melhor de 3 Sets
+              </span>
+            )}
+          </div>
+          <div className="max-w-md mx-auto">
+            {renderMatch(final[0])}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="space-y-16">
-      {/* Modal de W.O. */}
+      {/* Modal W.O. */}
       {woModal && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
@@ -318,7 +398,7 @@ export default function EliminationBracket({ onUpdate }) {
         </div>
       )}
 
-      {/* Modal de Editar Confronto */}
+      {/* Modal Editar Confronto */}
       {editTeamsModal && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full mx-4">
@@ -329,7 +409,6 @@ export default function EliminationBracket({ onUpdate }) {
             <p className="text-sm text-gray-500 mb-5">
               Selecione as duplas que vão se enfrentar nesta partida.
             </p>
-
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Dupla 1</label>
@@ -341,14 +420,12 @@ export default function EliminationBracket({ onUpdate }) {
                   <option value="">Selecione...</option>
                   {allGroupTeams.map(team => (
                     <option key={team.id} value={team.id}>
-                      {team.player1} / {team.player2}
+                      {team.player1} / {team.player2} — {team.club?.name}
                     </option>
                   ))}
                 </select>
               </div>
-
               <div className="text-center text-gray-400 text-sm font-medium">× VS ×</div>
-
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Dupla 2</label>
                 <select
@@ -359,13 +436,12 @@ export default function EliminationBracket({ onUpdate }) {
                   <option value="">Selecione...</option>
                   {allGroupTeams.map(team => (
                     <option key={team.id} value={team.id}>
-                      {team.player1} / {team.player2}
+                      {team.player1} / {team.player2} — {team.club?.name}
                     </option>
                   ))}
                 </select>
               </div>
             </div>
-
             <div className="flex gap-3 mt-6">
               <button
                 onClick={handleEditTeams}
@@ -384,52 +460,10 @@ export default function EliminationBracket({ onUpdate }) {
         </div>
       )}
 
-      {quartas.length > 0 && (
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-6">Quartas de Final</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {quartas.map(renderMatch)}
-          </div>
-        </div>
-      )}
+      {/* Bracket */}
+      {category === 'B' ? renderCategoryBBracket() : renderNormalBracket()}
 
-      {semi.length > 0 && (
-        <div>
-          <div className="flex items-center gap-3 mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Semifinal</h3>
-            {category === 'B' && (
-              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                2º lugar × 3º lugar
-              </span>
-            )}
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
-            {semi.map(renderMatch)}
-          </div>
-          {category === 'B' && (
-            <p className="text-xs text-gray-400 text-center mt-3">
-              O 1º colocado aguarda o vencedor desta semifinal para a grande final.
-            </p>
-          )}
-        </div>
-      )}
-
-      {final.length > 0 && (
-        <div>
-          <div className="flex items-center gap-3 mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Final</h3>
-            {final[0]?.isBestOf3 && (
-              <span className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded-full border border-amber-200 font-medium">
-                Melhor de 3 Sets
-              </span>
-            )}
-          </div>
-          <div className="max-w-md mx-auto">
-            {renderMatch(final[0])}
-          </div>
-        </div>
-      )}
-
+      {/* Campeão */}
       {champion && (
         <div className="border-2 border-gray-900 rounded-lg p-8 text-center max-w-md mx-auto">
           <Trophy className="w-12 h-12 mx-auto mb-4 text-gray-900" />

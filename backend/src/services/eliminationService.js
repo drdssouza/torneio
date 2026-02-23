@@ -37,7 +37,7 @@ export const generateElimination = async (category, gender, tournamentId) => {
     orderBy: { name: 'asc' }
   });
 
-  // ===== CATEGORIA B: formato especial =====
+  // ===== CATEGORIA B: Final direta 1º × 2º =====
   if (category === 'B') {
     if (groups.length !== 1) {
       throw new Error('Categoria B deve ter exatamente 1 grupo');
@@ -45,25 +45,26 @@ export const generateElimination = async (category, gender, tournamentId) => {
 
     const teams = groups[0].teams;
 
-    if (teams.length < 3) {
-      throw new Error('Categoria B precisa ter pelo menos 3 duplas no grupo para gerar eliminatórias');
+    if (teams.length < 2) {
+      throw new Error('Categoria B precisa ter pelo menos 2 duplas no grupo para gerar a final');
     }
 
+    const first = teams[0];
     const second = teams[1];
-    const third = teams[2];
 
-    console.log('=== CATEGORIA B - ELIMINATÓRIAS ===');
-    console.log('1º (bye → final):', teams[0].player1, '/', teams[0].player2);
-    console.log('Semi: 2º', second.player1, '/', second.player2, 'x 3º', third.player1, '/', third.player2);
+    console.log('=== CATEGORIA B - FINAL DIRETA ===');
+    console.log('1º:', first.player1, '/', first.player2);
+    console.log('2º:', second.player1, '/', second.player2);
 
-    const semi = await prisma.match.create({
+    const final = await prisma.match.create({
       data: {
-        team1Id: second.id,
-        team2Id: third.id,
+        team1Id: first.id,
+        team2Id: second.id,
         category,
         gender,
         tournamentId,
-        phase: 'semi'
+        phase: 'final',
+        isBestOf3: true
       },
       include: {
         team1: { include: { club: true } },
@@ -71,7 +72,7 @@ export const generateElimination = async (category, gender, tournamentId) => {
       }
     });
 
-    return [semi];
+    return [final];
   }
 
   // ===== CATEGORIAS NORMAIS (E, D, C): 4 grupos =====
@@ -247,57 +248,21 @@ export const advanceWinner = async (matchId, score1, score2, isWo = false, woTea
     });
 
     if (semiFinished.length === totalSemis) {
-      // Categoria B: 1 semi → final com 1º lugar do grupo + isBestOf3
-      if (match.category === 'B') {
-        const group = await prisma.group.findFirst({
-          where: {
-            category: match.category,
-            gender: match.gender,
-            tournamentId: match.tournamentId
-          },
-          include: {
-            teams: {
-              orderBy: [
-                { wins: 'desc' },
-                { gamesWon: 'desc' }
-              ]
-            }
-          }
-        });
+      // Categorias normais (E, D, C): 2 semis → final
+      const winners = semiFinished.map(m =>
+        m.score1 > m.score2 ? m.team1Id : m.team2Id
+      );
 
-        const firstPlace = group.teams[0];
-        const semiWinner = match.score1 > match.score2 ? match.team1Id : match.team2Id;
-
-        console.log('Categoria B - Criando final:', firstPlace.player1, '/', firstPlace.player2, '(1º lugar) x vencedor da semi');
-
-        await prisma.match.create({
-          data: {
-            team1Id: firstPlace.id,
-            team2Id: semiWinner,
-            category: match.category,
-            gender: match.gender,
-            tournamentId: match.tournamentId,
-            phase: 'final',
-            isBestOf3: true
-          }
-        });
-      } else {
-        // Categorias normais: 2 semis → final
-        const winners = semiFinished.map(m =>
-          m.score1 > m.score2 ? m.team1Id : m.team2Id
-        );
-
-        await prisma.match.create({
-          data: {
-            team1Id: winners[0],
-            team2Id: winners[1],
-            category: match.category,
-            gender: match.gender,
-            tournamentId: match.tournamentId,
-            phase: 'final'
-          }
-        });
-      }
+      await prisma.match.create({
+        data: {
+          team1Id: winners[0],
+          team2Id: winners[1],
+          category: match.category,
+          gender: match.gender,
+          tournamentId: match.tournamentId,
+          phase: 'final'
+        }
+      });
     }
   }
 

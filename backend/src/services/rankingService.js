@@ -121,24 +121,30 @@ async function calculateCategoryPoints(tournamentId, category, gender) {
     }
   }
 
-  // 5. Semifinais
-  const semis = await prisma.match.findMany({
-    where: { tournamentId, category, gender, phase: 'semi', status: 'finalizado' }
+  // 5. Semifinais (categorias E, D, C — categoria B vai direto à final, sem semi)
+  const totalSemiMatches = await prisma.match.count({
+    where: { tournamentId, category, gender, phase: 'semi' }
   });
 
-  if (semis.length === 0) {
-    console.log(`[RANKING] ${category} ${gender}: Sem semis finalizadas`);
-    return;
-  }
+  if (totalSemiMatches > 0) {
+    const semis = await prisma.match.findMany({
+      where: { tournamentId, category, gender, phase: 'semi', status: 'finalizado' }
+    });
 
-  for (const match of semis) {
-    const loserId = match.score1 > match.score2 ? match.team2Id : match.team1Id;
-    const loserWoCount = await getWoCount(loserId, tournamentId);
-    if (loserWoCount < 3) {
-      await prisma.team.update({
-        where: { id: loserId },
-        data: { points: POINTS.semi, placement: 'semi' }
-      });
+    if (semis.length === 0) {
+      console.log(`[RANKING] ${category} ${gender}: Sem semis finalizadas`);
+      return;
+    }
+
+    for (const match of semis) {
+      const loserId = match.score1 > match.score2 ? match.team2Id : match.team1Id;
+      const loserWoCount = await getWoCount(loserId, tournamentId);
+      if (loserWoCount < 3) {
+        await prisma.team.update({
+          where: { id: loserId },
+          data: { points: POINTS.semi, placement: 'semi' }
+        });
+      }
     }
   }
 

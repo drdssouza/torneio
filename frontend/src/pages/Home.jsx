@@ -221,7 +221,7 @@ export default function Home() {
               </span>
             </div>
             <p className="text-sm text-gray-500 mb-6">
-              Todos contra todos • 1º lugar vai direto à final • 2º × 3º disputam a semifinal
+              Todos contra todos • Os 2 melhores vão direto à final
             </p>
 
             <div className="max-w-xs">

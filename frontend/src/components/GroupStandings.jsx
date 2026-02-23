@@ -28,7 +28,7 @@ export default function GroupStandings() {
             </ol>
             {isCategoryB && (
               <p className="text-xs text-blue-700 mt-2 font-medium">
-                Categoria B: 1º vai direto à final • 2º e 3º disputam a semifinal
+                Categoria B: 1º e 2º vão direto à final
               </p>
             )}
           </div>
@@ -59,9 +59,7 @@ export default function GroupStandings() {
                 </thead>
                 <tbody>
                   {group.teams.map((team, i) => {
-                    const rowBg = isCategoryB
-                      ? (i === 0 ? 'bg-yellow-50' : i < 3 ? 'bg-green-50' : '')
-                      : (i < 2 ? 'bg-green-50' : '');
+                    const rowBg = i < 2 ? 'bg-green-50' : '';
 
                     return (
                       <tr
@@ -70,11 +68,8 @@ export default function GroupStandings() {
                       >
                         <td className="py-3 text-sm text-gray-900 font-medium">
                           {i + 1}
-                          {isCategoryB && i === 0 && (
-                            <span className="ml-1 text-yellow-600 text-xs font-normal">Final</span>
-                          )}
-                          {isCategoryB && (i === 1 || i === 2) && (
-                            <span className="ml-1 text-green-600">✓</span>
+                          {isCategoryB && i < 2 && (
+                            <span className="ml-1 text-green-600 text-xs font-normal">✓ Final</span>
                           )}
                           {!isCategoryB && i < 2 && (
                             <span className="ml-1 text-green-600">✓</span>
@@ -108,8 +103,7 @@ export default function GroupStandings() {
         {isCategoryB ? (
           <p className="text-xs text-gray-500">
             <span className="font-medium">Legenda:</span> V = Vitórias • GW = Games Vencidos • GL = Games Perdidos •{' '}
-            <span className="text-yellow-600 ml-1">1º → Final direta</span> •{' '}
-            <span className="text-green-600 ml-1">✓ 2º e 3º → Semifinal</span>
+            <span className="text-green-600 ml-1">✓ Final — 1º e 2º vão direto à final</span>
           </p>
         ) : (
           <p className="text-xs text-gray-500">
