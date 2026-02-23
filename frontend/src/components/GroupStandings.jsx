@@ -24,7 +24,7 @@ export default function GroupStandings() {
             <ol className="text-xs text-blue-800 space-y-1">
               <li>1º - Maior número de vitórias</li>
               <li>2º - Maior saldo de games (GW - GL)</li>
-              <li>3º - Maior número de games vencidos</li>
+              <li>3º - Maior % de games ganhos (GW / total jogados)</li>
             </ol>
             {isCategoryB && (
               <p className="text-xs text-blue-700 mt-2 font-medium">

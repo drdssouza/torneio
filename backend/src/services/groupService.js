@@ -71,7 +71,7 @@ export const generateGroups = async (category, gender, tournamentId) => {
         }
       }
 
-      return await prisma.group.findMany({
+      const bGroups = await prisma.group.findMany({
         where: { category, gender, tournamentId },
         include: {
           teams: { include: { club: true } },
@@ -83,6 +83,7 @@ export const generateGroups = async (category, gender, tournamentId) => {
           }
         }
       });
+      return bGroups.map(g => ({ ...g, teams: sortTeams(g.teams) }));
     }
 
     // Categorias normais (E, D, C): exigem exatamente 16 duplas
@@ -193,7 +194,7 @@ export const generateGroups = async (category, gender, tournamentId) => {
     });
 
     console.log(`[GROUPS] ✓ Geração concluída! ${result.length} grupos criados`);
-    return result;
+    return result.map(g => ({ ...g, teams: sortTeams(g.teams) }));
 
   } catch (error) {
     console.error('[GROUPS] ❌ ERRO:', error);
@@ -202,6 +203,21 @@ export const generateGroups = async (category, gender, tournamentId) => {
   }
 };
 
+// Vitórias desc → Saldo desc → % de games ganhos (GW / total jogados) desc
+function sortTeams(teams) {
+  return [...teams].sort((a, b) => {
+    if (b.wins !== a.wins) return b.wins - a.wins;
+    const saldoA = a.gamesWon - a.gamesLost;
+    const saldoB = b.gamesWon - b.gamesLost;
+    if (saldoB !== saldoA) return saldoB - saldoA;
+    const totalA = a.gamesWon + a.gamesLost;
+    const totalB = b.gamesWon + b.gamesLost;
+    const pctA = totalA > 0 ? a.gamesWon / totalA : 0;
+    const pctB = totalB > 0 ? b.gamesWon / totalB : 0;
+    return pctB - pctA;
+  });
+}
+
 export const getGroups = async (category, gender, tournamentId) => {
   try {
     console.log(`[GROUPS] Buscando grupos - ${category} ${gender} Tournament ${tournamentId}`);
@@ -209,13 +225,7 @@ export const getGroups = async (category, gender, tournamentId) => {
     const groups = await prisma.group.findMany({
       where: { category, gender, tournamentId },
       include: {
-        teams: {
-          include: { club: true },
-          orderBy: [
-            { wins: 'desc' },
-            { gamesWon: 'desc' }
-          ]
-        },
+        teams: { include: { club: true } },
         matches: {
           include: {
             team1: { include: { club: true } },
@@ -226,7 +236,7 @@ export const getGroups = async (category, gender, tournamentId) => {
     });
 
     console.log(`[GROUPS] Encontrados ${groups.length} grupos`);
-    return groups;
+    return groups.map(g => ({ ...g, teams: sortTeams(g.teams) }));
 
   } catch (error) {
     console.error('[GROUPS] Erro ao buscar grupos:', error);
